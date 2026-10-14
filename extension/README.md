@@ -1,6 +1,6 @@
-# DCMaster-gpt 视频填充助手 0.1.1（实验版）
+# DC Master 视频填充助手 0.1.1（实验版）
 
-在 Chrome 的 Figma 网页版提取已播放的视频填充，生成 MP4。独立安装，与 DCMaster-gpt Figma 插件配套使用。Figma 桌面端不加载 Chrome 扩展。
+在 Chrome 的 Figma 网页版提取已播放的视频填充，生成 MP4。独立安装，与 DC Master Figma 插件配套使用。Figma 桌面端不加载 Chrome 扩展。
 
 ## 安装
 
@@ -8,7 +8,7 @@
 2. Chrome 地址栏打开 `chrome://extensions`，开启「开发者模式」。
 3. 点击「加载已解压的扩展程序」，选择本文件所在的 `extension` 文件夹（里面有 manifest.json 和 dist/main.js）。不要选择 Figma 插件的 manifest。
 4. 登录 Figma 网页版，打开包含视频填充的文件。已经打开的页面需刷新一次。
-5. 播放目标视频。在右下角「DCMaster-gpt · 视频填充」面板中选择检测到的视频和清晰度。
+5. 播放目标视频。在右下角「DC Master · 视频填充」面板中选择检测到的视频和清晰度。
 6. 点击「提取为 MP4」，完成后点击「保存 MP4」。
 
 若未检测到，保持扩展启用，刷新 Figma 页面后重新播放。检测列表按媒体 hash 区分，不自动推断 Figma 当前选中图层或图层名。可以先只播放目标视频以便识别。面板标题可折叠。
