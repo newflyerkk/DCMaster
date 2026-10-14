@@ -1,0 +1,15 @@
+name: Build and check
+on: [push, pull_request]
+jobs:
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - run: node --test tests/core.test.mjs tests/plugin.test.mjs tests/png-quality.test.mjs tests/png-compat.test.mjs tests/import-files.test.mjs

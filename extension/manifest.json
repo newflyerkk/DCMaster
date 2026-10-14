@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "DCMaster-gpt 视频填充助手",
+  "version": "0.1.1",
+  "minimum_chrome_version": "111",
+  "description": "在 Figma 网页版提取已播放的视频填充，本地封装为 MP4。实验版。",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.figma.com/*",
+        "https://figma.com/*"
+      ],
+      "js": [
+        "dist/main.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    }
+  ]
+}
