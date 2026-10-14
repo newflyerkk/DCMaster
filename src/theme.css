@@ -24,3 +24,5 @@ html,body{height:100%;overflow:hidden}main{height:100%;display:flex;flex-directi
 #presets{grid-template-columns:repeat(5,minmax(0,1fr))}#presets .chip span{padding:7px 2px;font-size:11px}
 
 .option-check #merge-pdf{width:16px;height:16px}#pdf-order-options label{font-size:12px}
+
+.output-only .comparison{grid-template-columns:minmax(0,1fr)}.output-only .preview-media{height:200px}
