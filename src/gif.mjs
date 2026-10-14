@@ -1,11 +1,12 @@
 import UPNG from 'upng-js';
 // GIF89a with a per-frame adaptive palette and transparent index 0.
 // Clear LZW every 200 literals so the code width stays at 9 bits.
-export function encodeGIF(frames,width,height,delay=200){
+export function encodeGIF(frames,width,height,delay=200,loops=0){
+ if(!Number.isInteger(loops)||loops<0||loops>65536)throw Error('循环次数须为 0–65536 的整数。');
  if(!frames.length||width<1||height<1||width>4096||height>4096||width*height*frames.length>32_000_000)throw Error('GIF 画布过大，请减少倍率或帧数。');
  const out=[],put=(...v)=>out.push(...v),word=v=>put(v&255,v>>8),ascii=s=>{for(const c of s)put(c.charCodeAt(0));};
  ascii('GIF89a');word(width);word(height);put(0x70,0,0);
- put(0x21,0xff,11);ascii('NETSCAPE2.0');put(3,1,0,0,0);
+ if(loops!==1){put(0x21,0xff,11);ascii('NETSCAPE2.0');put(3,1);word(loops===0?0:loops-1);put(0);}
  for(const frame of frames){
   const rgba=new Uint8Array(frame.data.length),colors=new Map();
   for(let p=0;p<rgba.length;p+=4){const a=frame.data[p+3]/255;if(!a)continue;for(let c=0;c<3;c++)rgba[p+c]=Math.round(frame.data[p+c]*a+255*(1-a));rgba[p+3]=255;const key=(rgba[p]<<16)|(rgba[p+1]<<8)|rgba[p+2];if(colors.size<=255)colors.set(key,[rgba[p],rgba[p+1],rgba[p+2]]);}

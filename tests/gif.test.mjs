@@ -17,3 +17,8 @@ test('自适应 GIF 对不超过255色的非网格 RGB 精确保色',()=>{
  const data=Uint8Array.from([122,43,97,255,19,176,88,255]);const path=join(dir,'colors.gif');writeFileSync(path,encodeGIF([{width:2,height:1,data}],2,1));const raw=execFileSync('ffmpeg',['-v','error','-i',path,'-frames:v','1','-f','rawvideo','-pix_fmt','rgba','-']);assert.deepEqual(new Uint8Array(raw),data);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+test('GIF 默认无限，单次省略循环扩展，有限次数编码为总次数减一',()=>{
+ const frame={width:1,height:1,data:new Uint8Array([255,0,0,255])},marker=Buffer.from('NETSCAPE2.0');
+ for(const [loops,expected] of [[0,0],[1,null],[2,1],[10,9],[65536,65535]]){const b=Buffer.from(encodeGIF([frame],1,1,200,loops)),i=b.indexOf(marker);if(expected===null)assert.equal(i,-1);else{assert.ok(i>=0);assert.equal(b.readUInt16LE(i+13),expected);}}
+ assert.throws(()=>encodeGIF([frame],1,1,200,-1),/循环次数/);assert.throws(()=>encodeGIF([frame],1,1,200,1.5),/循环次数/);
+});

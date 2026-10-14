@@ -39,7 +39,7 @@
     return groups.flatMap((group) => group.sort((a, b) => secondary(a) - secondary(b) || a.index - b.index).map((item) => item.node));
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b;
+    var _a, _b, _c;
     if (msg.type === "ready") {
       selection();
       try {
@@ -188,7 +188,7 @@
         const receipt = new Promise((resolve) => {
           ack = resolve;
         });
-        figma.ui.postMessage({ type: "asset", format: "gif", frames, scale, index: 0, name: nodes[0].name + "_\u52A8\u753B", total, delay: msg.gifDelay });
+        figma.ui.postMessage({ type: "asset", format: "gif", frames, scale, index: 0, name: nodes[0].name + "_\u52A8\u753B", total, delay: msg.gifDelay, loops: (_c = msg.gifLoops) != null ? _c : 0 });
         await receipt;
       }
       for (let index = 0; index < videoFrames.length; index++) {

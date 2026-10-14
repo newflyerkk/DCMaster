@@ -42,8 +42,8 @@ test('多选对象 GIF 按选区顺序发送帧，每倍率输出一个动画',a
  const messages=[];const nodes=[1,2].map(id=>({name:'对象'+id,width:10,height:20,exportAsync:async()=>new Uint8Array([id])}));
  const figma={showUI(){},on(){},currentPage:{selection:nodes,on(){}},ui:{postMessage:m=>{messages.push(m);if(m.type==='asset')queueMicrotask(()=>figma.ui.onmessage({type:'ack'}));}}};
  vm.runInNewContext(readFileSync('dist/code.js','utf8'),{figma,__html__:'',Uint8Array});
- await figma.ui.onmessage({type:'prepare',formats:['gif'],scales:[1,2],gifDelay:300});
- const assets=messages.filter(m=>m.type==='asset');assert.equal(assets.length,2);assert.equal(assets[0].frames[0][0],1);assert.equal(assets[0].frames[1][0],2);assert.equal(assets[0].delay,300);assert.equal(assets[1].scale,2);assert.equal(assets[0].total,2);
+ await figma.ui.onmessage({type:'prepare',formats:['gif'],scales:[1,2],gifDelay:300,gifLoops:3});
+ const assets=messages.filter(m=>m.type==='asset');assert.equal(assets.length,2);assert.equal(assets[0].frames[0][0],1);assert.equal(assets[0].frames[1][0],2);assert.equal(assets[0].delay,300);assert.equal(assets[0].loops,3);assert.equal(assets[1].scale,2);assert.equal(assets[0].total,2);
 });
 test('取消 Frame 选项后图片直接置于页面，保持名称、尺寸与位置',async()=>{
  const messages=[],rectangles=[];

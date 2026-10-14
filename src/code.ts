@@ -121,7 +121,7 @@ figma.ui.onmessage = async msg => {
       }
       if (cancelled) break;
       const receipt = new Promise<void>(resolve => { ack = resolve; });
-      figma.ui.postMessage({type:'asset',format:'gif',frames,scale,index:0,name:nodes[0].name + '_动画',total,delay:msg.gifDelay});
+      figma.ui.postMessage({type:'asset',format:'gif',frames,scale,index:0,name:nodes[0].name + '_动画',total,delay:msg.gifDelay,loops:msg.gifLoops??0});
       await receipt;
     }
     for (let index = 0; index < videoFrames.length; index++) {
