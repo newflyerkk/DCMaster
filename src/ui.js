@@ -12,7 +12,7 @@ $('import-page').addEventListener('click',e=>{if(e.target===$('import-page')){co
 let previewURLs=[];
 function clearPreviews(){if(zoomDialog.open)zoomDialog.close();for(const url of previewURLs)URL.revokeObjectURL(url);previewURLs=[];}
 const zoomDialog=document.createElement('dialog');zoomDialog.id='zoom-preview';zoomDialog.setAttribute('aria-label','压缩前后放大对比');
-zoomDialog.innerHTML='<div class="modal-header"><h2>效果对比</h2><button type="button" aria-label="关闭放大预览">✕</button></div><label class="zoom-control">缩放 <select aria-label="图片缩放"><option value="fit">适应窗口</option><option value="1">100%</option><option value="2">200%</option><option value="4">400%</option></select></label><div class="zoom-content"></div>';
+zoomDialog.innerHTML='<div class="modal-header"><h2>效果对比</h2><button type="button" aria-label="关闭放大预览">✕</button></div><label class="zoom-control">缩放 <select aria-label="图片缩放"><option value="fit">自适应窗口</option><option value="1">100%</option></select></label><div class="zoom-content"></div>';
 document.body.append(zoomDialog);zoomDialog.querySelector('button').onclick=()=>zoomDialog.close();
 zoomDialog.addEventListener('close',()=>zoomDialog.querySelector('.zoom-content').replaceChildren());
 zoomDialog.querySelector('select').onchange=e=>{const area=zoomDialog.querySelector('.zoom-content');area.classList.toggle('actual-size',e.target.value!=='fit');for(const image of area.querySelectorAll('img')){image.style.width=e.target.value==='fit'?'':image.naturalWidth*Number(e.target.value)+'px';image.style.maxWidth=e.target.value==='fit'?'':'none';}};

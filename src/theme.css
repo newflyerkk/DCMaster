@@ -18,3 +18,5 @@ html,body{height:100%;overflow:hidden}main{height:100%;display:flex;flex-directi
 
 /* Shared typography and checkbox geometry for all option rows. */
 :root{--body-size:12px;--checkbox-size:16px}body,.small,.check,.option-check,#status,#import-status,.comparison figcaption,.zoom-control,.stats,.path{font-size:var(--body-size)}.option-check{display:flex;align-items:flex-start;gap:8px;line-height:20px;margin-top:10px;font-size:var(--body-size);cursor:pointer}.option-check>span{min-width:0}.option-check .small{font-size:inherit}.option-check input[type=checkbox]{width:var(--checkbox-size)!important;height:var(--checkbox-size)!important;flex:0 0 var(--checkbox-size);margin:2px 0 0!important;vertical-align:initial;accent-color:#007aff}.saving-percent{font-size:inherit}#import-drop .option-check{margin-bottom:16px}#import-status{font-size:var(--body-size)!important}
+/* Darken only the transparency background, never the resource pixels. */
+.preview-media{background-image:linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),repeating-conic-gradient(#eee 0% 25%,#fff 0% 50%);background-position:0 0,0 0;background-size:100% 100%,16px 16px}
