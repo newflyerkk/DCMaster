@@ -1,4 +1,4 @@
-# DC Master 视频填充助手 0.1.1（实验版）
+# DC Master 视频填充助手（实验版）
 
 在 Chrome 的 Figma 网页版提取已播放的视频填充，生成 MP4。独立安装，与 DC Master Figma 插件配套使用。Figma 桌面端不加载 Chrome 扩展。
 
@@ -43,7 +43,9 @@
 - 本项目自行实现资源选择、播放列表验证、下载限制与 UI；TS 封装使用 mux.js：https://github.com/videojs/mux.js
 - 第三方许可见 THIRD_PARTY_NOTICES.txt。
 
-## 0.1.1 修复
+## 更新日志
+
+### v0.1.1 修复
 
 修复流式 MP4 时长占位值导致 QuickTime 错误显示超长时长与黑屏的问题。使用 Mediabunny 重建索引和轨道时长，保持音视频相对时间关系，不重新编码。增加播放列表时长与实际帧时长一致性检查。
 
