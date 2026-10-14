@@ -1,5 +1,6 @@
 figma.showUI(__html__, { width: 420, height: 720, themeColors: true });
 let busy = false;
+let preferenceWrites = Promise.resolve();
 let cancelled = false;
 let ack: (() => void) | undefined;
 function selection() {
@@ -10,7 +11,16 @@ function watchPage() { figma.currentPage.on('nodechange', () => figma.ui.postMes
 watchPage();
 figma.on('currentpagechange', () => { watchPage(); selection(); });
 figma.ui.onmessage = async msg => {
-  if (msg.type === 'ready') { selection(); return; }
+  if (msg.type === 'ready') {
+    selection();
+    try { figma.ui.postMessage({type:'preferences',value:await figma.clientStorage?.getAsync('preferences-v1')}); }
+    catch { figma.ui.postMessage({type:'preferences'}); }
+    return;
+  }
+  if (msg.type === 'save-preferences') {
+    preferenceWrites = preferenceWrites.then(async()=>{await figma.clientStorage?.setAsync('preferences-v1',msg.value);}).catch(()=>{});
+    return;
+  }
   if (msg.type === 'ack') { ack?.(); ack = undefined; return; }
   if (msg.type === 'cancel') { cancelled = true; ack?.(); ack = undefined; return; }
   if (msg.type === 'import-images') {

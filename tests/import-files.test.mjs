@@ -13,3 +13,8 @@ test('支持普通文件拖入、空目录及读取失败',async()=>{
  assert.deepEqual(await collectDroppedFiles([directory([])],[{name:'a.jpeg'},{name:'a.pdf'}]),[{name:'a.jpeg'}]);
  await assert.rejects(collectDroppedFiles([{isDirectory:true,createReader:()=>({readEntries(resolve,reject){reject(Error('无法读取'));}})}]),/无法读取/);
 });
+test('文件夹与现代拖入接口包含压缩包',async()=>{
+ const {collectHandles}=await import('../src/import-files.mjs');
+ const files=await collectDroppedFiles([directory([[file('图包.rar'),file('图包.7z'),file('图包.zip')]])]);assert.equal(files.length,3);
+ const handles=[{kind:'directory',async *values(){yield {kind:'file',getFile:async()=>({name:'资源.7z'})};}}];assert.equal((await collectHandles(handles))[0].name,'资源.7z');
+});

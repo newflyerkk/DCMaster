@@ -1,4 +1,4 @@
-import {collectDroppedFiles,isImportImage} from './import-files.mjs';
+import {collectDroppedFiles,collectHandles,isImportImage,isArchive,isImportable} from './import-files.mjs';
 import {zipSync} from 'fflate';
 import {parseScales,outputPath} from './core.mjs';
 const $=id=>document.getElementById(id);
@@ -34,18 +34,29 @@ function addPreview(item,r){
  }else item.prepend(comparison([['压缩前',before,r.beforeFormat||r.format],['压缩后',after,r.format]],r.format,r.path));
 }
 
+let preferencesReady=false;
+function preferenceInputs(){return [...document.querySelectorAll('#settings input,#settings select,#import-create-frames')];}
+function preferenceKey(e){return e.id||`${e.name}:${e.value}`;}
+function savePreferences(){if(!preferencesReady)return;const value={};for(const e of preferenceInputs())value[preferenceKey(e)]=['checkbox','radio'].includes(e.type)?e.checked:e.value;send({type:'save-preferences',value});}
+document.addEventListener('input',savePreferences);document.addEventListener('change',savePreferences);
+function restorePreferences(value){
+ if(value&&typeof value==='object')for(const e of preferenceInputs()){const v=value[preferenceKey(e)];if(['checkbox','radio'].includes(e.type)){if(typeof v==='boolean')e.checked=v;}else if(typeof v==='string')e.value=v;}
+ if(!document.querySelector('input[name="preset"]:checked'))document.querySelector('input[value="lossless"]').checked=true;
+ preferencesReady=true;for(const e of preferenceInputs())e.disabled=false;$('preview').disabled=false;$('open-import').disabled=false;updateOptions();
+}
 function importMessage(text,error=false){$('import-status').textContent=text;$('import-status').className=error?'error':'small';}
 function finishImport(){importing=false;$('import-button').disabled=busy;$('import-folder-button').disabled=busy;$('preview').disabled=busy;$('import-create-frames').disabled=false;}
 $('import-button').onclick=()=>{if(!busy&&!importing)$('import-files').click();};
 function lockImport(){importing=true;$('import-create-frames').disabled=true;$('import-button').disabled=true;$('import-folder-button').disabled=true;$('preview').disabled=true;}
+function unpackFile(bytes){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(new Blob([ARCHIVE_SOURCE],{type:'application/javascript'}));const worker=new Worker(url);URL.revokeObjectURL(url);const timer=setTimeout(()=>{worker.terminate();reject(Error('解压超时，请拆分压缩包。'));},120000);const finish=()=>{clearTimeout(timer);worker.terminate();};worker.onmessage=({data})=>{finish();data.error?reject(Error(data.error)):resolve(data.files);};worker.onerror=()=>{finish();reject(Error('解压引擎运行失败。'));};worker.postMessage({bytes});});}
 async function importFiles(files){
  try{
-  files=files.filter(isImportImage);
-  if(!files.length)throw Error('未找到 PNG、JPG 或 WebP 图片。');
+  files=files.filter(isImportable);
+  if(!files.length)throw Error('未找到支持的图片或 ZIP / RAR / 7z 压缩包。');
   if(files.reduce((sum,f)=>sum+f.size,0)>128*1024*1024)throw Error('本批图片超过 128 MB，请分批导入。');
   const images=[];
-  for(const file of files){importMessage(`正在读取 ${images.length+1} / ${files.length}：${file.name}`);images.push({name:file.name,bytes:new Uint8Array(await file.arrayBuffer())});}
-  importMessage('正在导入原尺寸图片…');send({type:'import-images',files:images,createFrames:$('import-create-frames').checked});
+  for(const file of files){importMessage(`正在读取 ${images.length+1} / ${files.length}：${file.name}`);const bytes=new Uint8Array(await file.arrayBuffer());if(isArchive(file)){importMessage('正在解压：'+file.name);images.push(...await unpackFile(bytes));}else images.push({name:file.name,bytes});if(images.reduce((n,f)=>n+f.bytes.length,0)>128*1024*1024)throw Error('解压后图片超过 128 MB，请分批导入。');}
+  if(!images.length)throw Error('压缩包内没有支持的图片。');importMessage('正在导入原尺寸图片…');send({type:'import-images',files:images,createFrames:$('import-create-frames').checked});
  }catch(e){finishImport();importMessage(e.message,true);}
 }
 for(const id of ['import-files','import-folder'])$(id).onchange=()=>{
@@ -62,12 +73,13 @@ window.addEventListener('drop',async e=>{
  if(busy||importing)return;
  // Capture entries synchronously while the drag data store is accessible.
  const items=[...(e.dataTransfer?.items||[])].filter(i=>i.kind==='file');
- const entries=[],fallback=[];
- for(const item of items){const entry=item.webkitGetAsEntry?.();if(entry)entries.push(entry);else{const file=item.getAsFile();if(file)fallback.push(file);}}
+ const handlePromises=items.map(i=>{try{return i.getAsFileSystemHandle?.()||Promise.resolve(null);}catch{return Promise.resolve(null);}});
+ const entries=[],fallback=[...(e.dataTransfer?.files||[])].filter(isImportable);
+ for(const item of items){try{const entry=item.webkitGetAsEntry?.();if(entry)entries.push(entry);}catch{}}
  if(!items.length)fallback.push(...(e.dataTransfer?.files||[]));
  lockImport();importMessage('正在读取文件夹及子文件夹…');
- try{await importFiles(await collectDroppedFiles(entries,fallback));}
- catch(error){finishImport();importMessage('读取文件夹失败：'+error.message,true);}
+ try{let files;const handles=await Promise.all(handlePromises.map(p=>Promise.resolve(p).catch(()=>null)));try{files=handles.length&&handles.every(Boolean)?await collectHandles(handles):await collectDroppedFiles(entries,[]);}catch(error){if(fallback.length)files=fallback;else throw error;}if(!files.length)files=fallback;await importFiles(files);}
+ catch(error){finishImport();importMessage('当前 Figma 无法读取拖入的文件夹，请点击“选择文件夹”导入，或将文件夹压成 ZIP / RAR / 7z 后拖入。',true);}
 });
 const size=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(2)+' MB';
 function message(text,error=false){$('status').textContent=text;$('status').className=error?'error':'';}
@@ -83,7 +95,7 @@ function updateOptions(){
  $('format-note').textContent=notes.join('；')+(notes.length?'。':'');
  if(formats.includes('mp4')) notes.push('MP4 导出整个动态顶层 Frame；无损/高清均使用视频高质量，不保证无损；最高 4K');
  $('format-note').textContent=notes.join('；')+(notes.length?'。':'');
- $('gif-options').hidden=!formats.includes('gif');document.querySelector('input[value="lossless"]').nextElementSibling.textContent=formats.includes('gif')?'保色优先':'无损';$('format-note').hidden=!(formats.includes('gif')||preset==='none');
+ const requestedDelay=Number($('gif-delay').value),delay=Math.max(20,Math.round(requestedDelay/10)*10);$('gif-rate').textContent=delay>0?`每帧 ${delay} 毫秒 · 每秒约 ${Number((1000/delay).toFixed(2))} 帧`:'';$('gif-options').hidden=!formats.includes('gif');document.querySelector('input[value="lossless"]').nextElementSibling.textContent=formats.includes('gif')?'保色优先':'无损';$('format-note').hidden=!(formats.includes('gif')||preset==='none');
  $('jpeg-options').hidden=!formats.includes('jpeg');
  if(formats.includes('gif'))$('format-note').textContent='GIF 使用自适应调色板，超过 255 色仍需量化，不能保证无损。';else if(preset==='none')$('format-note').textContent='PNG / JPEG 直接使用 Figma 原生导出；SVG / PDF 仅调整倍率。WebP / GIF 为格式转换，无法与原生输出逐字节对齐。';
  const raster=formats.some(f=>['png','jpeg','webp'].includes(f));
@@ -103,11 +115,11 @@ $('preview').onclick=()=>{
  const thisRun=run;worker.onmessage=({data})=>{if(run!==thisRun||!busy)return;if(data.error){stop();message(data.error,true);return;}const r=data.result;r.path=outputPath(r,settings.named,used,settings.scaleSuffix);results.push(r);if(results.reduce((s,r)=>s+r.size+(r.beforeBytes?.length||0)+(r.beforeFrames?.reduce((n,b)=>n+b.length,0)||0),0)>256*1024*1024){stop();message('结果超过 256 MB，请减少对象或倍率后分批导出。',true);return;}const item=document.createElement('div');item.className='item';const path=document.createElement('div');path.className='path';path.textContent=r.path;const detail=document.createElement('div');detail.className='small';const pct=(1-r.size/r.originalSize)*100;detail.textContent=r.format==='mp4'?`${size(r.size)} · ${r.note}`:`${size(r.originalSize)} → ${size(r.size)} · ${pct>=0?'节省':'增加'} ${Math.abs(pct).toFixed(1)}% · ${r.note}`;const saving=detail.textContent.match(/节省 ([0-9.]+)%/);if(saving){const text=detail.textContent;const position=text.indexOf(saving[0]);const highlight=document.createElement('strong');highlight.className='saving-percent';highlight.textContent=saving[1]+'%';detail.replaceChildren(document.createTextNode(text.slice(0,position)+'节省 '),highlight,document.createTextNode(text.slice(position+saving[0].length)));}item.append(path,detail);addPreview(item,r);$('results').append(item);$('progress').max=r.total;$('progress').value=results.length;message(`已处理 ${results.length} / ${r.total}`);send({type:'ack'});};message('正在导出并试压，首次加载编码器可能稍慢…');send({type:'prepare',...settings});
  }catch(e){message(e.message,true);}
 };
-window.onmessage=({data})=>{const m=data.pluginMessage;if(!m)return;if(m.type==='import-progress'){importMessage(m.message);return;}if(m.type==='import-result'){finishImport();importMessage(m.error?`导入失败：${m.error}`:`已导入 ${m.count} 张图片，已选中新建的${m.createFrames===false?'图片':' Frame'}。`,!!m.error);return;}if(m.type==='selection'){const key=JSON.stringify(m.nodes);$('selection').textContent=m.nodes.length?`已选择 ${m.nodes.length} 个对象 · ${m.nodes.slice(0,3).map(n=>n.name).join('、')}`:'请在画布中选择要导出的对象';if(selectionKey&&key!==selectionKey)invalidate();selectionKey=key;}
+window.onmessage=({data})=>{const m=data.pluginMessage;if(!m)return;if(m.type==='preferences'){restorePreferences(m.value);return;}if(m.type==='import-progress'){importMessage(m.message);return;}if(m.type==='import-result'){finishImport();importMessage(m.error?`导入失败：${m.error}`:`已导入 ${m.count} 张图片，已选中新建的${m.createFrames===false?'图片':' Frame'}。`,!!m.error);return;}if(m.type==='selection'){const key=JSON.stringify(m.nodes);$('selection').textContent=m.nodes.length?`已选择 ${m.nodes.length} 个对象 · ${m.nodes.slice(0,3).map(n=>n.name).join('、')}`:'请在画布中选择要导出的对象';if(selectionKey&&key!==selectionKey)invalidate();selectionKey=key;}
  if(m.type==='progress'&&busy)message(m.message);
  if(m.type==='invalidate')invalidate();
  if(m.type==='asset'&&busy)worker.postMessage({id:run,asset:m,settings});
  if(m.type==='error'){stop();message(m.message,true);}
  if(m.type==='done'&&busy){finish();worker?.terminate();worker=null;if(m.cancelled){results=[];message('已取消。');return;}const compressed=results.filter(r=>r.format!=='mp4');const before=compressed.reduce((s,r)=>s+r.originalSize,0),after=compressed.reduce((s,r)=>s+r.size,0);const totalBytes=results.reduce((s,r)=>s+r.size,0);$('summary').textContent=`${results.length} 个文件 · 总计 ${size(totalBytes)} · 图片/文档 ${size(before)} → ${size(after)} · ${after<=before?'节省':'增加'} ${before?Math.abs((1-after/before)*100).toFixed(1):0}%`;if(!compressed.length)$('summary').textContent=`${results.length} 个视频 · ${size(totalBytes)} · 原生编码，无二次压缩`;$('summary').className='stats';$('download').disabled=stale||!results.length;message(stale?'选区已变化，请重新预览。':'试压完成，以上为实际文件大小。');}}
 $('download').onclick=()=>{try{const files={};for(const r of results)files[r.path]=[r.bytes,{level:r.format==='svg'?6:0}];const blob=new Blob([zipSync(files)],{type:'application/zip'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='DC Master.zip';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){message('打包失败：'+e.message,true);}};
-send({type:'ready'});
+for(const e of preferenceInputs())e.disabled=true;$('preview').disabled=true;$('open-import').disabled=true;send({type:'ready'});

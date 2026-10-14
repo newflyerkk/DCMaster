@@ -57,3 +57,8 @@ test('不压缩 JPEG 调用 Figma 原生 JPG 导出并标记原生字节',async(
  const calls=[],messages=[];const figma={showUI(){},on(){},currentPage:{selection:[{name:'原图',width:54,height:54,exportAsync:async o=>{calls.push(o);return new Uint8Array([1,2,3]);}}],on(){}},ui:{postMessage:m=>{messages.push(m);if(m.type==='asset')queueMicrotask(()=>figma.ui.onmessage({type:'ack'}));}}};
  vm.runInNewContext(readFileSync('dist/code.js','utf8'),{figma,__html__:'',Uint8Array});await figma.ui.onmessage({type:'prepare',formats:['jpeg'],scales:[2],mode:'none'});assert.equal(calls[0].format,'JPG');assert.equal(calls[0].constraint.value,2);assert.equal(messages.find(m=>m.type==='asset').native,true);
 });
+test('选项写入本地存储并在下次 ready 恢复',async()=>{
+ const storage=new Map(),messages=[];const figma={showUI(){},on(){},currentPage:{selection:[],on(){}},clientStorage:{getAsync:async k=>storage.get(k),setAsync:async(k,v)=>storage.set(k,v)},ui:{postMessage:m=>messages.push(m)}};
+ vm.runInNewContext(readFileSync('dist/code.js','utf8'),{figma,__html__:'',Uint8Array});
+ await figma.ui.onmessage({type:'save-preferences',value:{named:false,'scale-suffix':false}});await new Promise(r=>setTimeout(r,0));await figma.ui.onmessage({type:'ready'});assert.equal(messages.at(-1).value.named,false);assert.equal(messages.at(-1).value['scale-suffix'],false);
+});

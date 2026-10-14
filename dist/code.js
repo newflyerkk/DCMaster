@@ -3,6 +3,7 @@
   // src/code.ts
   figma.showUI(__html__, { width: 420, height: 720, themeColors: true });
   var busy = false;
+  var preferenceWrites = Promise.resolve();
   var cancelled = false;
   var ack;
   function selection() {
@@ -18,9 +19,22 @@
     selection();
   });
   figma.ui.onmessage = async (msg) => {
-    var _a;
+    var _a, _b;
     if (msg.type === "ready") {
       selection();
+      try {
+        figma.ui.postMessage({ type: "preferences", value: await ((_a = figma.clientStorage) == null ? void 0 : _a.getAsync("preferences-v1")) });
+      } catch (e) {
+        figma.ui.postMessage({ type: "preferences" });
+      }
+      return;
+    }
+    if (msg.type === "save-preferences") {
+      preferenceWrites = preferenceWrites.then(async () => {
+        var _a2;
+        await ((_a2 = figma.clientStorage) == null ? void 0 : _a2.setAsync("preferences-v1", msg.value));
+      }).catch(() => {
+      });
       return;
     }
     if (msg.type === "ack") {
@@ -114,7 +128,7 @@
       const videoFrames = [];
       if (formats.includes("mp4")) {
         for (const node of nodes) {
-          const frame = node.type === "FRAME" && ((_a = node.parent) == null ? void 0 : _a.type) === "PAGE" ? node : node.getTopLevelFrame();
+          const frame = node.type === "FRAME" && ((_b = node.parent) == null ? void 0 : _b.type) === "PAGE" ? node : node.getTopLevelFrame();
           if (!frame) throw new Error(`${node.name} \u6CA1\u6709\u6240\u5C5E\u9876\u5C42 Frame\u3002\u8BF7\u5C06\u89C6\u9891\u653E\u5165\u9875\u9762\u9876\u5C42 Frame \u540E\u518D\u5BFC\u51FA MP4\u3002`);
           if (!videoFrames.some((f) => f.id === frame.id)) videoFrames.push(frame);
         }

@@ -21,3 +21,5 @@ desktop/tests/ui-input/
 
 .local-deploy.json
 *.deploy-tmp
+
+node_modules
