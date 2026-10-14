@@ -86,6 +86,7 @@ function message(text,error=false){$('status').textContent=text;$('status').clas
 function invalidate(){stale=true;$('download').disabled=true;if(!busy){results=[];clearPreviews();$('summary').replaceChildren();$('results').replaceChildren();message('设置或设计已更新，请重新计算预览。');}}
 function updateOptions(){
  const formats=[...$('formats').querySelectorAll('input:checked')].map(i=>i.value);
+ $('pdf-options').hidden=!formats.includes('pdf');$('pdf-order-options').hidden=!$('merge-pdf').checked;
  const preset=document.querySelector('input[name="preset"]:checked').value;
  $('preset-description').textContent={none:'Figma 原生格式直接导出，不做压缩。',lossless:'保留像素，自动优化文件大小。',quality:'画质优先，适合细节丰富的设计。',balanced:'兼顾画质与文件大小，适合日常交付。',size:'更积极地减小文件，可能出现可见画质损失。'}[preset];
  const notes=[];
@@ -108,7 +109,7 @@ function stop(){run++;worker?.terminate();worker=null;send({type:'cancel'});fini
 $('cancel').onclick=()=>{stop();message('已取消，未完成的结果已清除。');};
 $('preview').onclick=()=>{
  if(importing)return;
- try{const formats=[...$('formats').querySelectorAll('input:checked')].map(i=>i.value);if(!formats.length)throw Error('请至少选择一种格式。');const gifDelay=Number($('gif-delay').value);if(formats.includes('gif')&&(!Number.isFinite(gifDelay)||gifDelay<20||gifDelay>10000))throw Error('GIF 每帧时长须为 20–10000 毫秒。');settings={formats,gifDelay,scales:parseScales([...$('scales').querySelectorAll('input:checked')].map(i=>i.value),$('custom').value),mode:document.querySelector('input[name="preset"]:checked').value,effort:$('deep').checked?'deep':'balanced',named:$('named').checked,scaleSuffix:$('scale-suffix').checked,background:$('background').value.slice(1)};
+ try{const formats=[...$('formats').querySelectorAll('input:checked')].map(i=>i.value);if(!formats.length)throw Error('请至少选择一种格式。');const gifDelay=Number($('gif-delay').value);if(formats.includes('gif')&&(!Number.isFinite(gifDelay)||gifDelay<20||gifDelay>10000))throw Error('GIF 每帧时长须为 20–10000 毫秒。');settings={formats,gifDelay,mergePDF:$('merge-pdf').checked,pdfOrder:$('pdf-order').value,scales:parseScales([...$('scales').querySelectorAll('input:checked')].map(i=>i.value),$('custom').value),mode:document.querySelector('input[name="preset"]:checked').value,effort:$('deep').checked?'deep':'balanced',named:$('named').checked,scaleSuffix:$('scale-suffix').checked,background:$('background').value.slice(1)};
  clearPreviews();results=[];used=new Set();stale=false;busy=true;$('import-button').disabled=true;$('import-folder-button').disabled=true;run++;$('results').replaceChildren();$('summary').replaceChildren();$('download').disabled=true;$('preview').disabled=true;$('cancel').hidden=false;$('progress').hidden=false;$('progress').value=0;for(const e of $('settings').elements)e.disabled=true;
  worker?.terminate();const url=URL.createObjectURL(new Blob([WORKER_SOURCE],{type:'application/javascript'}));worker=new Worker(url);URL.revokeObjectURL(url);
  worker.onerror=e=>{stop();message('压缩引擎运行失败：'+e.message,true);};

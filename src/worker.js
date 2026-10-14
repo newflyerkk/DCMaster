@@ -1,3 +1,4 @@
+import {mergePDFs} from './pdf.mjs';
 import {rgbaPNG} from './png-compat.mjs';
 import {encodeGIF} from './gif.mjs';
 import UPNG from 'upng-js';
@@ -24,6 +25,7 @@ async function init() {
   await ready;
 }
 async function process(asset, settings) {
+  if(asset.pdfSources){const merged=await mergePDFs(asset.pdfSources,asset.scale,settings.mode==='none');return {...asset,pdfSources:undefined,bytes:merged.after,beforeBytes:merged.before,beforeFormat:'pdf',originalSize:merged.before.length,size:merged.after.length,note:`${merged.pages} 页 · ${settings.pdfOrder==='column'?'优先竖列':'优先横排'} · 保留矢量`};}
   if(asset.native){const input=new Uint8Array(asset.bytes);return {...asset,bytes:input,beforeBytes:input,beforeFormat:asset.format,originalSize:input.length,size:input.length,note:'Figma 原生导出 · 未压缩'};}
   const uncompressed=settings.mode==='none';
   if(uncompressed)settings={...settings,mode:'lossless'};

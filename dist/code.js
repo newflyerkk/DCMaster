@@ -18,6 +18,26 @@
     watchPage();
     selection();
   });
+  function pdfOrder(nodes, order) {
+    const vertical = order === "column";
+    const positioned = nodes.map((node, index) => {
+      var _a, _b, _c, _d;
+      const b = node.absoluteBoundingBox;
+      return { node, index, x: (_a = b == null ? void 0 : b.x) != null ? _a : node.x, y: (_b = b == null ? void 0 : b.y) != null ? _b : node.y, width: (_c = b == null ? void 0 : b.width) != null ? _c : node.width, height: (_d = b == null ? void 0 : b.height) != null ? _d : node.height };
+    });
+    const primary = (n) => vertical ? n.x : n.y;
+    const secondary = (n) => vertical ? n.y : n.x;
+    positioned.sort((a, b) => primary(a) - primary(b) || secondary(a) - secondary(b) || a.index - b.index);
+    const groups = [];
+    for (const item of positioned) {
+      const last = groups[groups.length - 1];
+      const anchor = last == null ? void 0 : last[0];
+      const tolerance = anchor ? Math.min(24, (vertical ? Math.min(anchor.width, item.width) : Math.min(anchor.height, item.height)) * 0.25) : 0;
+      if (anchor && Math.abs(primary(item) - primary(anchor)) <= tolerance) last.push(item);
+      else groups.push([item]);
+    }
+    return groups.flatMap((group) => group.sort((a, b) => secondary(a) - secondary(b) || a.index - b.index).map((item) => item.node));
+  }
   figma.ui.onmessage = async (msg) => {
     var _a, _b;
     if (msg.type === "ready") {
@@ -124,7 +144,8 @@
       const scales = msg.scales;
       const formats = msg.formats;
       if (!nodes.length || !scales.length || !formats.length || scales.some((s) => !Number.isFinite(s) || s <= 0 || s > 16) || formats.some((f) => !["png", "jpeg", "webp", "svg", "pdf", "mp4", "gif"].includes(f))) throw new Error("\u8BF7\u9009\u62E9\u5BF9\u8C61\u3001\u683C\u5F0F\u53CA\u6709\u6548\u500D\u7387\uFF080\u201316x\uFF09\u3002");
-      const imageFormats = formats.filter((f) => f !== "mp4" && f !== "gif");
+      const mergePDF = formats.includes("pdf") && msg.mergePDF === true;
+      const imageFormats = formats.filter((f) => f !== "mp4" && f !== "gif" && !(mergePDF && f === "pdf"));
       const videoFrames = [];
       if (formats.includes("mp4")) {
         for (const node of nodes) {
@@ -133,7 +154,26 @@
           if (!videoFrames.some((f) => f.id === frame.id)) videoFrames.push(frame);
         }
       }
-      const total = (nodes.length * imageFormats.length + videoFrames.length + (formats.includes("gif") ? 1 : 0)) * scales.length;
+      const total = (nodes.length * imageFormats.length + videoFrames.length + (formats.includes("gif") ? 1 : 0) + (mergePDF ? 1 : 0)) * scales.length;
+      if (mergePDF) for (const scale of scales) {
+        const ordered = pdfOrder(nodes, msg.pdfOrder);
+        const sources = [];
+        let bytes = 0;
+        for (const node of ordered) {
+          if (cancelled) break;
+          figma.ui.postMessage({ type: "progress", message: `\u6B63\u5728\u51C6\u5907 PDF \u9875\u9762 ${sources.length + 1} / ${ordered.length}\uFF1A${node.name}` });
+          const source = await node.exportAsync({ format: "PDF", colorProfile: "SRGB" });
+          bytes += source.length;
+          if (bytes > 128 * 1024 * 1024) throw Error("\u5F85\u5408\u5E76 PDF \u8D85\u8FC7 128 MB\uFF0C\u8BF7\u5206\u6279\u5BFC\u51FA\u3002");
+          sources.push(source);
+        }
+        if (cancelled) break;
+        const receipt = new Promise((resolve) => {
+          ack = resolve;
+        });
+        figma.ui.postMessage({ type: "asset", format: "pdf", pdfSources: sources, scale, index: 0, name: "\u5408\u5E76\u6587\u6863", total });
+        await receipt;
+      }
       if (formats.includes("gif")) for (const scale of scales) {
         const frames = [];
         let pixels = 0;

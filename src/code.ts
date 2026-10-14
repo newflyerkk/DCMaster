@@ -10,6 +10,16 @@ figma.on('selectionchange', selection);
 function watchPage() { figma.currentPage.on('nodechange', () => figma.ui.postMessage({ type: 'invalidate' })); }
 watchPage();
 figma.on('currentpagechange', () => { watchPage(); selection(); });
+function pdfOrder(nodes: readonly SceneNode[], order: string) {
+  const vertical = order === 'column';
+  const positioned = nodes.map((node,index)=>{const b=node.absoluteBoundingBox;return {node,index,x:b?.x??node.x,y:b?.y??node.y,width:b?.width??node.width,height:b?.height??node.height};});
+  const primary = (n:typeof positioned[number])=>vertical?n.x:n.y;
+  const secondary = (n:typeof positioned[number])=>vertical?n.y:n.x;
+  positioned.sort((a,b)=>primary(a)-primary(b)||secondary(a)-secondary(b)||a.index-b.index);
+  const groups: typeof positioned[] = [];
+  for(const item of positioned){const last=groups[groups.length-1];const anchor=last?.[0];const tolerance=anchor?Math.min(24,(vertical?Math.min(anchor.width,item.width):Math.min(anchor.height,item.height))*.25):0;if(anchor&&Math.abs(primary(item)-primary(anchor))<=tolerance)last.push(item);else groups.push([item]);}
+  return groups.flatMap(group=>group.sort((a,b)=>secondary(a)-secondary(b)||a.index-b.index).map(item=>item.node));
+}
 figma.ui.onmessage = async msg => {
   if (msg.type === 'ready') {
     selection();
@@ -80,7 +90,8 @@ figma.ui.onmessage = async msg => {
     const scales = msg.scales as number[];
     const formats = msg.formats as string[];
     if (!nodes.length || !scales.length || !formats.length || scales.some(s => !Number.isFinite(s) || s <= 0 || s > 16) || formats.some(f => !['png','jpeg','webp','svg','pdf','mp4','gif'].includes(f))) throw new Error('请选择对象、格式及有效倍率（0–16x）。');
-    const imageFormats = formats.filter(f => f !== 'mp4' && f !== 'gif');
+    const mergePDF = formats.includes('pdf') && msg.mergePDF === true;
+    const imageFormats = formats.filter(f => f !== 'mp4' && f !== 'gif' && !(mergePDF && f === 'pdf'));
     const videoFrames: FrameNode[] = [];
     if (formats.includes('mp4')) {
       for (const node of nodes) {
@@ -89,7 +100,15 @@ figma.ui.onmessage = async msg => {
         if (!videoFrames.some(f => f.id === frame.id)) videoFrames.push(frame);
       }
     }
-    const total = (nodes.length * imageFormats.length + videoFrames.length + (formats.includes('gif') ? 1 : 0)) * scales.length;
+    const total = (nodes.length * imageFormats.length + videoFrames.length + (formats.includes('gif') ? 1 : 0) + (mergePDF ? 1 : 0)) * scales.length;
+    if (mergePDF) for(const scale of scales){
+      const ordered = pdfOrder(nodes,msg.pdfOrder);
+      const sources:Uint8Array[]=[];let bytes=0;
+      for(const node of ordered){if(cancelled)break;figma.ui.postMessage({type:'progress',message:`正在准备 PDF 页面 ${sources.length+1} / ${ordered.length}：${node.name}`});const source=await node.exportAsync({format:'PDF',colorProfile:'SRGB'});bytes+=source.length;if(bytes>128*1024*1024)throw Error('待合并 PDF 超过 128 MB，请分批导出。');sources.push(source);}
+      if(cancelled)break;
+      const receipt=new Promise<void>(resolve=>{ack=resolve;});
+      figma.ui.postMessage({type:'asset',format:'pdf',pdfSources:sources,scale,index:0,name:'合并文档',total});await receipt;
+    }
     if (formats.includes('gif')) for (const scale of scales) {
       const frames: Uint8Array[] = [];
       let pixels = 0;

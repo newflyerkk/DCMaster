@@ -62,3 +62,12 @@ test('选项写入本地存储并在下次 ready 恢复',async()=>{
  vm.runInNewContext(readFileSync('dist/code.js','utf8'),{figma,__html__:'',Uint8Array});
  await figma.ui.onmessage({type:'save-preferences',value:{named:false,'scale-suffix':false}});await new Promise(r=>setTimeout(r,0));await figma.ui.onmessage({type:'ready'});assert.equal(messages.at(-1).value.named,false);assert.equal(messages.at(-1).value['scale-suffix'],false);
 });
+test('合并 PDF 按画布绝对位置横排或竖列，不受选区顺序影响',async()=>{
+ for(const [order,expected] of [['row',['A','B','C','D']],['column',['A','C','B','D']]]){
+  const messages=[],calls=[];const nodes=[['D',200,200],['B',200,2],['C',0,200],['A',0,0]].map(([name,x,y])=>({name,x:999,y:999,width:100,height:100,absoluteBoundingBox:{x,y,width:100,height:100},exportAsync:async opts=>{calls.push({name,format:opts.format});return new Uint8Array([name.charCodeAt(0)]);}}));
+  const figma={showUI(){},on(){},currentPage:{selection:nodes,on(){}},ui:{postMessage:m=>{messages.push(m);if(m.type==='asset')queueMicrotask(()=>figma.ui.onmessage({type:'ack'}));}}};
+  vm.runInNewContext(readFileSync('dist/code.js','utf8'),{figma,__html__:'',Uint8Array});await figma.ui.onmessage({type:'prepare',formats:['pdf','png'],scales:[1,2],mergePDF:true,pdfOrder:order});
+  assert.deepEqual(calls.filter(c=>c.format==='PDF').slice(0,4).map(c=>c.name),expected);
+  const merged=messages.filter(m=>m.pdfSources);assert.equal(merged.length,2);assert.equal(merged[0].total,10);assert.deepEqual(Array.from(merged[0].pdfSources,b=>String.fromCharCode(b[0])),expected);assert.equal(messages.filter(m=>m.type==='asset').length,10);assert.equal(nodes[0].x,999);
+ }
+});

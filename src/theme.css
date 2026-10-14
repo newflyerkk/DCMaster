@@ -22,3 +22,5 @@ html,body{height:100%;overflow:hidden}main{height:100%;display:flex;flex-directi
 .preview-media{background-image:linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),repeating-conic-gradient(#eee 0% 25%,#fff 0% 50%);background-position:0 0,0 0;background-size:100% 100%,16px 16px}
 
 #presets{grid-template-columns:repeat(5,minmax(0,1fr))}#presets .chip span{padding:7px 2px;font-size:11px}
+
+.option-check #merge-pdf{width:16px;height:16px}#pdf-order-options label{font-size:12px}
