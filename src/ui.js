@@ -10,14 +10,28 @@ $('open-import').onclick=()=>{if(busy)return;$('import-page').showModal();};
 $('back-home').onclick=()=>{$('import-page').close();};
 $('import-page').addEventListener('click',e=>{if(e.target===$('import-page')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
 let previewURLs=[];
-function clearPreviews(){for(const url of previewURLs)URL.revokeObjectURL(url);previewURLs=[];}
+function clearPreviews(){if(zoomDialog.open)zoomDialog.close();for(const url of previewURLs)URL.revokeObjectURL(url);previewURLs=[];}
+const zoomDialog=document.createElement('dialog');zoomDialog.id='zoom-preview';zoomDialog.setAttribute('aria-label','压缩前后放大对比');
+zoomDialog.innerHTML='<div class="modal-header"><h2>效果对比</h2><button type="button" aria-label="关闭放大预览">✕</button></div><label class="zoom-control">缩放 <select aria-label="图片缩放"><option value="fit">适应窗口</option><option value="1">100%</option><option value="2">200%</option><option value="4">400%</option></select></label><div class="zoom-content"></div>';
+document.body.append(zoomDialog);zoomDialog.querySelector('button').onclick=()=>zoomDialog.close();
+zoomDialog.addEventListener('close',()=>zoomDialog.querySelector('.zoom-content').replaceChildren());
+zoomDialog.querySelector('select').onchange=e=>{const area=zoomDialog.querySelector('.zoom-content');area.classList.toggle('actual-size',e.target.value!=='fit');for(const image of area.querySelectorAll('img')){image.style.width=e.target.value==='fit'?'':image.naturalWidth*Number(e.target.value)+'px';image.style.maxWidth=e.target.value==='fit'?'':'none';}};
+function previewURL(bytes,format){const url=URL.createObjectURL(new Blob([bytes],{type:{png:'image/png',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',svg:'image/svg+xml',pdf:'application/pdf',mp4:'video/mp4'}[format]}));previewURLs.push(url);return url;}
+function comparison(sources,format,name,large=false){
+ const grid=document.createElement('div');grid.className='comparison';
+ for(const [label,url,f] of sources){const figure=document.createElement('figure'),caption=document.createElement('figcaption');caption.textContent=label;
+ const media=document.createElement(f==='pdf'?'iframe':f==='mp4'?'video':'img');media.className='preview-media';media.src=url;
+ if(f==='pdf')media.title=name+' '+label;else if(f==='mp4')media.controls=true;else media.alt=name+' '+label;
+ if(!large&&f!=='pdf'&&f!=='mp4'){const button=document.createElement('button');button.type='button';button.className='preview-open';button.setAttribute('aria-label','放大查看 '+name+' '+label);button.append(media);button.onclick=()=>{zoomDialog.querySelector('h2').textContent=name;zoomDialog.querySelector('select').value='fit';const area=zoomDialog.querySelector('.zoom-content');area.classList.remove('actual-size');area.replaceChildren(comparison(sources,format,name,true));zoomDialog.showModal();};figure.append(caption,button);}else figure.append(caption,media);
+ grid.append(figure);}
+ return grid;
+}
 function addPreview(item,r){
- const mime={png:'image/png',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',svg:'image/svg+xml',pdf:'application/pdf',mp4:'video/mp4'}[r.format];
- const url=URL.createObjectURL(new Blob([r.bytes],{type:mime}));previewURLs.push(url);
- const media=document.createElement(r.format==='mp4'?'video':r.format==='pdf'?'iframe':'img');media.className='preview-media';
- if(r.format==='mp4'){media.controls=true;media.loop=true;media.muted=true;}else if(r.format==='pdf'){media.title=r.path+' 输出预览';}else{media.alt=r.path+' 输出效果';media.loading='lazy';}
- media.src=url;item.prepend(media);
- const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';link.textContent='打开完整预览';item.append(link);
+ const after=previewURL(r.bytes,r.format);
+ const before=r.beforeBytes?previewURL(r.beforeBytes,r.beforeFormat):after;
+ if(r.beforeFrames){
+  for(let i=0;i<r.beforeFrames.length;i++){const title=document.createElement('div');title.className='small';title.textContent=`源帧 ${i+1} / ${r.beforeFrames.length} → GIF 动画`;item.append(title,comparison([['转换前 · 源帧',previewURL(r.beforeFrames[i],'png'),'png'],['转换后 · 动画',after,'gif']],r.format,r.path));}
+ }else item.prepend(comparison([['压缩前',before,r.beforeFormat||r.format],['压缩后',after,r.format]],r.format,r.path));
 }
 
 function importMessage(text,error=false){$('import-status').textContent=text;$('import-status').className=error?'error':'small';}
@@ -85,7 +99,7 @@ $('preview').onclick=()=>{
  clearPreviews();results=[];used=new Set();stale=false;busy=true;$('import-button').disabled=true;$('import-folder-button').disabled=true;run++;$('results').replaceChildren();$('summary').replaceChildren();$('download').disabled=true;$('preview').disabled=true;$('cancel').hidden=false;$('progress').hidden=false;$('progress').value=0;for(const e of $('settings').elements)e.disabled=true;
  worker?.terminate();const url=URL.createObjectURL(new Blob([WORKER_SOURCE],{type:'application/javascript'}));worker=new Worker(url);URL.revokeObjectURL(url);
  worker.onerror=e=>{stop();message('压缩引擎运行失败：'+e.message,true);};
- const thisRun=run;worker.onmessage=({data})=>{if(run!==thisRun||!busy)return;if(data.error){stop();message(data.error,true);return;}const r=data.result;r.path=outputPath(r,settings.named,used);results.push(r);if(results.reduce((s,r)=>s+r.size,0)>256*1024*1024){stop();message('结果超过 256 MB，请减少对象或倍率后分批导出。',true);return;}const item=document.createElement('div');item.className='item';const path=document.createElement('div');path.className='path';path.textContent=r.path;const detail=document.createElement('div');detail.className='small';const pct=(1-r.size/r.originalSize)*100;detail.textContent=r.format==='mp4'?`${size(r.size)} · ${r.note}`:`${size(r.originalSize)} → ${size(r.size)} · ${pct>=0?'节省':'增加'} ${Math.abs(pct).toFixed(1)}% · ${r.note}`;item.append(path,detail);addPreview(item,r);$('results').append(item);$('progress').max=r.total;$('progress').value=results.length;message(`已处理 ${results.length} / ${r.total}`);send({type:'ack'});};message('正在导出并试压，首次加载编码器可能稍慢…');send({type:'prepare',...settings});
+ const thisRun=run;worker.onmessage=({data})=>{if(run!==thisRun||!busy)return;if(data.error){stop();message(data.error,true);return;}const r=data.result;r.path=outputPath(r,settings.named,used);results.push(r);if(results.reduce((s,r)=>s+r.size+(r.beforeBytes?.length||0)+(r.beforeFrames?.reduce((n,b)=>n+b.length,0)||0),0)>256*1024*1024){stop();message('结果超过 256 MB，请减少对象或倍率后分批导出。',true);return;}const item=document.createElement('div');item.className='item';const path=document.createElement('div');path.className='path';path.textContent=r.path;const detail=document.createElement('div');detail.className='small';const pct=(1-r.size/r.originalSize)*100;detail.textContent=r.format==='mp4'?`${size(r.size)} · ${r.note}`:`${size(r.originalSize)} → ${size(r.size)} · ${pct>=0?'节省':'增加'} ${Math.abs(pct).toFixed(1)}% · ${r.note}`;const saving=detail.textContent.match(/节省 ([0-9.]+)%/);if(saving){const text=detail.textContent;const position=text.indexOf(saving[0]);const highlight=document.createElement('strong');highlight.className='saving-percent';highlight.textContent=saving[1]+'%';detail.replaceChildren(document.createTextNode(text.slice(0,position)+'节省 '),highlight,document.createTextNode(text.slice(position+saving[0].length)));}item.append(path,detail);addPreview(item,r);$('results').append(item);$('progress').max=r.total;$('progress').value=results.length;message(`已处理 ${results.length} / ${r.total}`);send({type:'ack'});};message('正在导出并试压，首次加载编码器可能稍慢…');send({type:'prepare',...settings});
  }catch(e){message(e.message,true);}
 };
 window.onmessage=({data})=>{const m=data.pluginMessage;if(!m)return;if(m.type==='import-progress'){importMessage(m.message);return;}if(m.type==='import-result'){finishImport();importMessage(m.error?`导入失败：${m.error}`:`已导入 ${m.count} 张图片，已选中新建的${m.createFrames===false?'图片':' Frame'}。`,!!m.error);return;}if(m.type==='selection'){const key=JSON.stringify(m.nodes);$('selection').textContent=m.nodes.length?`已选择 ${m.nodes.length} 个对象 · ${m.nodes.slice(0,3).map(n=>n.name).join('、')}`:'请在画布中选择要导出的对象';if(selectionKey&&key!==selectionKey)invalidate();selectionKey=key;}

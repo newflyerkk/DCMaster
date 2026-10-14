@@ -29,7 +29,7 @@ async function process(asset, settings) {
     const frames=[];for(const source of asset.frames)frames.push(await pngDecode(new Uint8Array(source).buffer));
     const width=Math.max(...frames.map(f=>f.width)),height=Math.max(...frames.map(f=>f.height));
     const output=encodeGIF(frames,width,height,asset.delay||200);
-    return {...asset,frames:undefined,bytes:output,size:output.length,originalSize:asset.frames.reduce((n,b)=>n+b.length,0),note:`${frames.length} 帧 · ${width}×${height} · ${asset.delay||200} ms/帧 · 循环播放 · 256 色有损`};
+    return {...asset,frames:undefined,beforeFrames:asset.frames,beforeFormat:'png',bytes:output,size:output.length,originalSize:asset.frames.reduce((n,b)=>n+b.length,0),note:`${frames.length} 帧 · ${width}×${height} · ${asset.delay||200} ms/帧 · 循环播放 · 256 色有损`};
   }
   let input=new Uint8Array(asset.bytes), output, baseline=input, note='';
   const level={fast:1,balanced:3,deep:6}[settings.effort];
@@ -103,6 +103,6 @@ async function process(asset, settings) {
       output=smaller(baseline,output);
     }
   }
-  return { ...asset, bytes:output, originalSize:baseline.length, size:output.length, note };
+  return { ...asset, beforeBytes:['svg','pdf'].includes(asset.format)?baseline:input,beforeFormat:['svg','pdf'].includes(asset.format)?asset.format:'png',bytes:output, originalSize:baseline.length, size:output.length, note };
 }
 self.onmessage=async ({data})=>{try{const result=await process(data.asset,data.settings);self.postMessage({id:data.id,result});}catch(e){self.postMessage({id:data.id,error:e.message||String(e)});}};
