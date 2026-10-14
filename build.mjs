@@ -9,3 +9,6 @@ const theme=await readFile('src/theme.css','utf8');
 const html=(await readFile('src/ui.html','utf8')).replaceAll('{{VERSION}}',version).replace('</style>',theme+'\n</style>');
 await writeFile('dist/ui.html',html.replace('<!--SCRIPT-->',()=>`<script>${ui.outputFiles[0].text.replaceAll('</script','<\\/script')}</script>`));
 console.log('Built offline plugin: dist/code.js + dist/ui.html');
+
+// Optional machine-local target: keep the manifest registered in Figma current.
+await (await import('./scripts/deploy-local.mjs')).deployLocal();

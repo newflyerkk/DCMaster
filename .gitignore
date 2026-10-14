@@ -18,3 +18,6 @@ tests/browser-results.json
 tests/video-fixtures/*-output.mp4
 tests/video-fixtures/browser-*.mp4
 desktop/tests/ui-input/
+
+.local-deploy.json
+*.deploy-tmp
