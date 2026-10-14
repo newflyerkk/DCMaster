@@ -4,9 +4,9 @@ export function parseScales(values, custom='') {
   return [...new Set(all)].sort((a,b)=>a-b);
 }
 export function safeName(name) { return (name.normalize('NFC').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').replace(/[. ]+$/g,'').slice(0,100) || '未命名'); }
-export function outputPath(asset, named, used) {
+export function outputPath(asset, named, used, scaleSuffix=true) {
   const base = named ? safeName(asset.name) : `${asset.format}_${String(asset.index+1).padStart(3,'0')}`;
-  const suffix = asset.scale === 1 ? '' : `@${asset.scale}x`;
+  const suffix = !scaleSuffix || asset.scale === 1 ? '' : `@${asset.scale}x`;
   const prefix = `${asset.format}/${asset.scale}x/`;
   let path = `${prefix}${base}${suffix}.${asset.format}`, i=2;
   while(used.has(path.toLowerCase())) path=`${prefix}${base}_${i++}${suffix}.${asset.format}`;
