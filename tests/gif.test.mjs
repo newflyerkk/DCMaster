@@ -12,3 +12,8 @@ test('GIF 可完整解码，保留帧顺序、时长、尺寸和循环',()=>{
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
 test('拒绝过大的统一 GIF 画布',()=>assert.throws(()=>encodeGIF([{width:1,height:1,data:new Uint8Array(4)}],5000,10),/过大/));
+test('自适应 GIF 对不超过255色的非网格 RGB 精确保色',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'dc-colors-'));try{
+ const data=Uint8Array.from([122,43,97,255,19,176,88,255]);const path=join(dir,'colors.gif');writeFileSync(path,encodeGIF([{width:2,height:1,data}],2,1));const raw=execFileSync('ffmpeg',['-v','error','-i',path,'-frames:v','1','-f','rawvideo','-pix_fmt','rgba','-']);assert.deepEqual(new Uint8Array(raw),data);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});

@@ -168,7 +168,9 @@
           for (const format of imageFormats) {
             if (cancelled) break;
             let bytes;
-            if (["png", "jpeg", "webp"].includes(format)) {
+            if (msg.mode === "none" && format === "jpeg") {
+              bytes = await node.exportAsync({ format: "JPG", constraint: { type: "SCALE", value: scale }, colorProfile: "SRGB" });
+            } else if (["png", "jpeg", "webp"].includes(format)) {
               png != null ? png : png = await node.exportAsync({ format: "PNG", constraint: { type: "SCALE", value: scale }, colorProfile: "SRGB" });
               bytes = png;
             } else {
@@ -178,7 +180,7 @@
             const receipt = new Promise((resolve) => {
               ack = resolve;
             });
-            figma.ui.postMessage({ type: "asset", bytes, format, scale, index, name: node.name, total });
+            figma.ui.postMessage({ type: "asset", bytes, format, scale, index, name: node.name, total, native: msg.mode === "none" && (["png", "jpeg"].includes(format) || scale === 1 && ["svg", "pdf"].includes(format)) });
             await receipt;
           }
         }

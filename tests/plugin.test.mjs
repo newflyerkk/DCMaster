@@ -53,3 +53,7 @@ test('取消 Frame 选项后图片直接置于页面，保持名称、尺寸与�
  await figma.ui.onmessage({type:'import-images',createFrames:false,files:[{name:'close.png',bytes:new Uint8Array([1])}]});
  assert.equal(rectangles[0].name,'close');assert.equal(rectangles[0].width,54);assert.equal(rectangles[0].height,54);assert.equal(rectangles[0].x,100);assert.equal(rectangles[0].y,200);assert.equal(rectangles[0].parent,page);assert.equal(page.selection[0],rectangles[0]);assert.equal(messages.at(-1).createFrames,false);
 });
+test('不压缩 JPEG 调用 Figma 原生 JPG 导出并标记原生字节',async()=>{
+ const calls=[],messages=[];const figma={showUI(){},on(){},currentPage:{selection:[{name:'原图',width:54,height:54,exportAsync:async o=>{calls.push(o);return new Uint8Array([1,2,3]);}}],on(){}},ui:{postMessage:m=>{messages.push(m);if(m.type==='asset')queueMicrotask(()=>figma.ui.onmessage({type:'ack'}));}}};
+ vm.runInNewContext(readFileSync('dist/code.js','utf8'),{figma,__html__:'',Uint8Array});await figma.ui.onmessage({type:'prepare',formats:['jpeg'],scales:[2],mode:'none'});assert.equal(calls[0].format,'JPG');assert.equal(calls[0].constraint.value,2);assert.equal(messages.find(m=>m.type==='asset').native,true);
+});

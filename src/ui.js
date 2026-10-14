@@ -75,7 +75,7 @@ function invalidate(){stale=true;$('download').disabled=true;if(!busy){results=[
 function updateOptions(){
  const formats=[...$('formats').querySelectorAll('input:checked')].map(i=>i.value);
  const preset=document.querySelector('input[name="preset"]:checked').value;
- $('preset-description').textContent={lossless:'保留像素，自动优化文件大小。',quality:'画质优先，适合细节丰富的设计。',balanced:'兼顾画质与文件大小，适合日常交付。',size:'更积极地减小文件，可能出现可见画质损失。'}[preset];
+ $('preset-description').textContent={none:'Figma 原生格式直接导出，不做压缩。',lossless:'保留像素，自动优化文件大小。',quality:'画质优先，适合细节丰富的设计。',balanced:'兼顾画质与文件大小，适合日常交付。',size:'更积极地减小文件，可能出现可见画质损失。'}[preset];
  const notes=[];
  if(formats.includes('png')) notes.push(preset==='lossless'?'PNG 保持像素完全一致':'PNG 启用减色及透明度量化，档位越低允许的误差越大');
  if(formats.some(f=>['svg','pdf'].includes(f))) notes.push('SVG / PDF 各档均保留矢量，采用保守优化');
@@ -83,8 +83,9 @@ function updateOptions(){
  $('format-note').textContent=notes.join('；')+(notes.length?'。':'');
  if(formats.includes('mp4')) notes.push('MP4 导出整个动态顶层 Frame；无损/高清均使用视频高质量，不保证无损；最高 4K');
  $('format-note').textContent=notes.join('；')+(notes.length?'。':'');
- $('gif-options').hidden=!formats.includes('gif');
+ $('gif-options').hidden=!formats.includes('gif');document.querySelector('input[value="lossless"]').nextElementSibling.textContent=formats.includes('gif')?'保色优先':'无损';$('format-note').hidden=!(formats.includes('gif')||preset==='none');
  $('jpeg-options').hidden=!formats.includes('jpeg');
+ if(formats.includes('gif'))$('format-note').textContent='GIF 使用自适应调色板，超过 255 色仍需量化，不能保证无损。';else if(preset==='none')$('format-note').textContent='PNG / JPEG 直接使用 Figma 原生导出；SVG / PDF 仅调整倍率。WebP / GIF 为格式转换，无法与原生输出逐字节对齐。';
  const raster=formats.some(f=>['png','jpeg','webp'].includes(f));
  $('deep-option').hidden=!raster;$('special').hidden=!raster&&!formats.includes('mp4');
 }

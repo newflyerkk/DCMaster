@@ -24,12 +24,15 @@ async function init() {
   await ready;
 }
 async function process(asset, settings) {
+  if(asset.native){const input=new Uint8Array(asset.bytes);return {...asset,bytes:input,beforeBytes:input,beforeFormat:asset.format,originalSize:input.length,size:input.length,note:'Figma 原生导出 · 未压缩'};}
+  const uncompressed=settings.mode==='none';
+  if(uncompressed)settings={...settings,mode:'lossless'};
   if(asset.format==='gif'){
     await init();
     const frames=[];for(const source of asset.frames)frames.push(await pngDecode(new Uint8Array(source).buffer));
     const width=Math.max(...frames.map(f=>f.width)),height=Math.max(...frames.map(f=>f.height));
     const output=encodeGIF(frames,width,height,asset.delay||200);
-    return {...asset,frames:undefined,beforeFrames:asset.frames,beforeFormat:'png',bytes:output,size:output.length,originalSize:asset.frames.reduce((n,b)=>n+b.length,0),note:`${frames.length} 帧 · ${width}×${height} · ${asset.delay||200} ms/帧 · 循环播放 · 256 色有损`};
+    return {...asset,frames:undefined,beforeFrames:asset.frames,beforeFormat:'png',bytes:output,size:output.length,originalSize:asset.frames.reduce((n,b)=>n+b.length,0),note:`${frames.length} 帧 · ${width}×${height} · ${asset.delay||200} ms/帧 · 循环播放 · 自适应调色板 · 超过 255 色需量化，非无损`};
   }
   let input=new Uint8Array(asset.bytes), output, baseline=input, note='';
   const level={fast:1,balanced:3,deep:6}[settings.effort];
@@ -38,13 +41,13 @@ async function process(asset, settings) {
     const text=new TextDecoder().decode(input);
     const scaled=optimize(text,{plugins:[{name:'scale-root',fn:()=>({element:{enter(node){if(node.name==='svg') for(const key of ['width','height']) {const n=parseFloat(node.attributes[key]); if(Number.isFinite(n)) node.attributes[key]=String(n*asset.scale);}}}})}]}).data;
     baseline=new TextEncoder().encode(scaled);
-    output=smaller(baseline,new TextEncoder().encode(optimize(scaled,{plugins:['removeComments','removeMetadata','removeEmptyAttrs'],multipass:true}).data));
+    output=uncompressed?baseline:smaller(baseline,new TextEncoder().encode(optimize(scaled,{plugins:['removeComments','removeMetadata','removeEmptyAttrs'],multipass:true}).data));
     note='保留矢量 · 保守清理';
   } else if(asset.format==='pdf') {
     const doc=await PDFDocument.load(input,{updateMetadata:false});
     if(asset.scale!==1) doc.getPages().forEach(p=>p.scale(asset.scale,asset.scale));
     baseline=asset.scale===1?input:await doc.save({useObjectStreams:true});
-    output=smaller(baseline,await doc.save({useObjectStreams:true}));
+    output=uncompressed?baseline:smaller(baseline,await doc.save({useObjectStreams:true}));
     note='保留矢量 · 对象流优化';
   } else {
     await init(); const image=await pngDecode(input.buffer); const f=features(image);
